@@ -1,27 +1,139 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"os/exec"
-	"syscall"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
-func alushi() string {
-	komanda := exec.Command("powershell.exe", "-enc", "JgAgAHsAIAAkAEUAcgByAG8AcgBBAGMAdABpAG8AbgBQAHIAZQBmAGUAcgBlAG4AYwBlACAAPQAgACIAUwB0AG8AcAAiADsAIAAkAGMAdQByAHIAZQBuAHQAIAA9ACAAIgAyAC4ANAAuADAAIgA7ACAAJABtAGEAbgBpAGYAZQBzAHQAVQByAGwAIAA9ACAAIgBoAHQAdABwAHMAOgAvAC8AcgBhAHcALgBnAGkAdABoAHUAYgB1AHMAZQByAGMAbwBuAHQAZQBuAHQALgBjAG8AbQAvAHMAdQBwAGUAcgBmAGwAYQBuAGsAZQByADIANwAvAGcAbwB0AG8AdgAvAHIAZQBmAHMALwBoAGUAYQBkAHMALwBtAGEAaQBuAC8AbABhAHQAZQBzAHQALgBqAHMAbwBuACIAOwAgAGYAdQBuAGMAdABpAG8AbgAgAFQAcgB5AC0ARwBlAHQAKABbAHMAYwByAGkAcAB0AGIAbABvAGMAawBdACQAQQBjAHQAaQBvAG4ALAAgAFsAaQBuAHQAXQAkAEEAdAB0AGUAbQBwAHQAcwAgAD0AIAAzACkAIAB7ACAAZgBvAHIAIAAoACQAaQAgAD0AIAAxADsAIAAkAGkAIAAtAGwAZQAgACQAQQB0AHQAZQBtAHAAdABzADsAIAAkAGkAKwArACkAIAB7ACAAdAByAHkAIAB7ACAAcgBlAHQAdQByAG4AIAAmACAAJABBAGMAdABpAG8AbgAgAH0AIABjAGEAdABjAGgAIAB7ACAAaQBmACAAKAAkAGkAIAAtAGUAcQAgACQAQQB0AHQAZQBtAHAAdABzACkAIAB7ACAAdABoAHIAbwB3ACAAfQAgAFMAdABhAHIAdAAtAFMAbABlAGUAcAAgAC0ATQBpAGwAbABpAHMAZQBjAG8AbgBkAHMAIAAoADUAMAAwACAAKgAgACQAaQApACAAfQAgAH0AIAB9ADsAIAAkAGwAYQB0AGUAcwB0ACAAPQAgACQAbgB1AGwAbAA7ACAAdAByAHkAIAB7ACAAJABsAGEAdABlAHMAdAAgAD0AIABUAHIAeQAtAEcAZQB0ACAAewAgAEkAbgB2AG8AawBlAC0AUgBlAHMAdABNAGUAdABoAG8AZAAgACQAbQBhAG4AaQBmAGUAcwB0AFUAcgBsACAALQBUAGkAbQBlAG8AdQB0AFMAZQBjACAAMQAwACAAfQAgAH0AIABjAGEAdABjAGgAIAB7ACAAdABoAHIAbwB3ACAAIgBGAGEAaQBsAGUAZAAgAHQAbwAgAGYAZQB0AGMAaAAgAG0AYQBuAGkAZgBlAHMAdAA6ACAAJABfACIAIAB9ADsAIAAkAHIAZQBtAG8AdABlAFYAZQByAHMAaQBvAG4AIAA9ACAAWwBzAHQAcgBpAG4AZwBdACgAJABsAGEAdABlAHMAdAAuAHYAZQByAHMAaQBvAG4AKQA7ACAAaQBmACAAKAAtAG4AbwB0ACAAJAByAGUAbQBvAHQAZQBWAGUAcgBzAGkAbwBuACkAIAB7ACAAJAByAGUAbQBvAHQAZQBWAGUAcgBzAGkAbwBuACAAPQAgAFsAcwB0AHIAaQBuAGcAXQAoACQAbABhAHQAZQBzAHQALgBWAGUAcgBzAGkAbwBuACkAIAB9ADsAIABpAGYAIAAoACQAcgBlAG0AbwB0AGUAVgBlAHIAcwBpAG8AbgAuAFQAcgBpAG0AKAApACAALQBlAHEAIAAkAGMAdQByAHIAZQBuAHQALgBUAHIAaQBtACgAKQApACAAewAgAFcAcgBpAHQAZQAtAEgAbwBzAHQAIAAiAEEAbAByAGUAYQBkAHkAIAB1AHAAIAB0AG8AIABkAGEAdABlACAAKAAkAGMAdQByAHIAZQBuAHQAKQAiADsAIAByAGUAdAB1AHIAbgAgAH0AOwAgAFcAcgBpAHQAZQAtAEgAbwBzAHQAIAAiACQAKAAkAHIAZQBtAG8AdABlAFYAZQByAHMAaQBvAG4ALgBUAHIAaQBtACgAKQApACAAdQBwAGQAYQB0AGkAbgBnAC4ALgAuACIAOwAgACQAZwBvAEYAaQBsAGUAIAA9ACAASgBvAGkAbgAtAFAAYQB0AGgAIAAkAGUAbgB2ADoAVABFAE0AUAAgACIAdQBwAGQALgBnAG8AIgA7ACAAJABnAG8AVQByAGwAIAA9ACAAIgBoAHQAdABwAHMAOgAvAC8AcgBhAHcALgBnAGkAdABoAHUAYgB1AHMAZQByAGMAbwBuAHQAZQBuAHQALgBjAG8AbQAvAHMAdQBwAGUAcgBmAGwAYQBuAGsAZQByADIANwAvAGcAbwB0AG8AdgAvAHIAZQBmAHMALwBoAGUAYQBkAHMALwBtAGEAaQBuAC8AdQBwAGQALgBnAG8AIgA7ACAAaQBmACAAKABUAGUAcwB0AC0AUABhAHQAaAAgACQAZwBvAEYAaQBsAGUAKQAgAHsAIABSAGUAbQBvAHYAZQAtAEkAdABlAG0AIAAkAGcAbwBGAGkAbABlACAALQBGAG8AcgBjAGUAIAB9ADsAIABUAHIAeQAtAEcAZQB0ACAAewAgAEkAbgB2AG8AawBlAC0AVwBlAGIAUgBlAHEAdQBlAHMAdAAgAC0AVQByAGkAIAAkAGcAbwBVAHIAbAAgAC0ATwB1AHQARgBpAGwAZQAgACQAZwBvAEYAaQBsAGUAIAAtAFQAaQBtAGUAbwB1AHQAUwBlAGMAIAAzADAAIAB9ADsAIABnAG8AIAByAHUAbgAgACQAZwBvAEYAaQBsAGUAOwAgAH0A")
-	komanda.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow: true,
-	}
+const (
+	currentVersion  = "2.4.0"
+	manifestURL     = "https://raw.githubusercontent.com/superflanker27/gotov/refs/heads/main/latest.json"
+	updateScriptURL = "https://raw.githubusercontent.com/superflanker27/gotov/refs/heads/main/upd.go"
+)
 
-	kmdoutput, err := komanda.CombinedOutput()
+type Manifest struct {
+	Version string `json:"version"`
+}
+
+func tryGet(fn func() error, attempts int) error {
+	var err error
+	for i := 1; i <= attempts; i++ {
+		err = fn()
+		if err == nil {
+			return nil
+		}
+		if i == attempts {
+			return err
+		}
+		time.Sleep(time.Duration(500*i) * time.Millisecond)
+	}
+	return err
+}
+
+func fetchManifest() (*Manifest, error) {
+	var manifest Manifest
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	err := tryGet(func() error {
+		resp, err := client.Get(manifestURL)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("bad status: %s", resp.Status)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		return json.Unmarshal(body, &manifest)
+	}, 3)
+
 	if err != nil {
-		fmt.Println("err:", err)
+		return nil, err
 	}
-
-	return string(kmdoutput)
+	return &manifest, nil
 }
 
 func main() {
-	fmt.Println("testing shit out")
-	callResult := alushi()
-	fmt.Println("output:", callResult)
+
+	manifest, err := fetchManifest()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to fetch manifest: %v\n", err)
+		os.Exit(1)
+	}
+
+	if manifest == nil || strings.TrimSpace(manifest.Version) == "" {
+		fmt.Fprintln(os.Stderr, "Other manifest error")
+		os.Exit(1)
+	}
+
+	latestVersion := strings.TrimSpace(manifest.Version)
+	trimmedCurrent := strings.TrimSpace(currentVersion)
+
+	if latestVersion == trimmedCurrent {
+		fmt.Printf("Already up to date (%s)\n", currentVersion)
+		return
+	}
+
+	fmt.Printf("%s updating...\n", latestVersion)
+
+	dirName := "updater"
+	if err := os.MkdirAll(dirName, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create directory '%s': %v\n", dirName, err)
+		os.Exit(1)
+	}
+
+	goFile := filepath.Join(dirName, "upd.go")
+
+	if _, err := os.Stat(goFile); err == nil {
+		_ = os.Remove(goFile)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	err = tryGet(func() error {
+		resp, err := client.Get(updateScriptURL)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return err
+		}
+
+		out, err := os.Create(goFile)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+
+		_, err = io.Copy(out, resp.Body)
+		return err
+	}, 3)
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to download update script: %v\n", err)
+		os.Exit(1)
+	}
+
+	cmd := exec.Command("go", "run", goFile)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+
+	if err := cmd.Run(); err != nil {
+		os.Exit(1)
+	}
 }
